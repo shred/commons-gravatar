@@ -8,7 +8,7 @@
  * it under the terms of the GNU Library General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -33,23 +33,23 @@ public interface GravatarService {
     /**
      * Computes the Gravatar hash for a mail address. Actually, this is the md5 sum of the
      * mail address.
-     * 
+     *
      * @param mail
      *            Mail address to hash
      * @return Gravatar hash
      */
     String computeHash(String mail);
-    
+
     /**
      * Fetch a File of the Gravatar image for the given hash. If there is no such file,
      * the image is downloaded from the Gravatar server, and stored in the file system.
      * <p>
      * The files are cached for a certain time.
-     * 
+     *
      * @param hash
      *            Gravatar image hash
      * @return File containing the image
      */
     File fetchGravatar(String hash) throws IOException;
-    
+
 }

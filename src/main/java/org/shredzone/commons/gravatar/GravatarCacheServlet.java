@@ -8,7 +8,7 @@
  * it under the terms of the GNU Library General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -39,13 +39,13 @@ import org.springframework.web.servlet.FrameworkServlet;
  * kept high even if the Gravatar servers are currently under high load or unreachable.
  * Additionally, privacy is kept because the visitor's IP and browser headers are kept
  * hidden from the Gravatar servers.
- * 
+ *
  * @author Richard "Shred" Körber
  */
 public class GravatarCacheServlet extends FrameworkServlet {
-	private static final long serialVersionUID = 5962372398781412921L;
-	
-	private static final Pattern HASH_PATTERN = Pattern.compile("/([0-9a-f]{32})");
+    private static final long serialVersionUID = 5962372398781412921L;
+
+    private static final Pattern HASH_PATTERN = Pattern.compile("/([0-9a-f]{32})");
 
     @Override
     protected void doService(HttpServletRequest req, HttpServletResponse resp)
@@ -67,14 +67,14 @@ public class GravatarCacheServlet extends FrameworkServlet {
         } catch (IllegalArgumentException ex) {
             // As stated in RFC2616 Sec. 14.25, an invalid date will just be ignored.
         }
-        
+
         if (modifiedSinceTs >= 0
                 && (modifiedSinceTs / 1000L) == (gravatarFile.lastModified() / 1000L)) {
             // The image has not been modified since last request
             resp.sendError(HttpServletResponse.SC_NOT_MODIFIED);
             return;
         }
-        
+
         long size = gravatarFile.length();
         if (size > 0 && size <= Integer.MAX_VALUE) {
             // Cast to int is safe
