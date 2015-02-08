@@ -20,6 +20,9 @@
 
 package org.shredzone.commons.gravatar.impl;
 
+import static java.util.Comparator.comparing;
+import static java.util.stream.Collectors.joining;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -30,9 +33,8 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Iterator;
-import java.util.SortedMap;
-import java.util.TreeMap;
+import java.util.Arrays;
+import java.util.stream.IntStream;
 
 import org.shredzone.commons.gravatar.GravatarService;
 import org.slf4j.Logger;
@@ -77,18 +79,14 @@ public class GravatarServiceImpl implements GravatarService {
             md5.reset();
             md5.update(mail.trim().toLowerCase().getBytes("UTF-8"));
 
-            StringBuilder digest = new StringBuilder();
-            for (byte b : md5.digest()) {
-                digest.append(String.format("%02x", b & 0xFF));
-            }
+            byte[] digest = md5.digest();
 
-            return digest.toString();
-        } catch (NoSuchAlgorithmException ex) {
-            // should never happen since MD5 is a standard digester
-            throw new InternalError("no md5 hashing");
-        } catch (UnsupportedEncodingException ex) {
-            // should never happen since UTF-8 is a standard encoding
-            throw new InternalError("no utf-8 encoding");
+            return IntStream.range(0, digest.length)
+                    .mapToObj(ix -> String.format("%02x", digest[ix] & 0xFF))
+                    .collect(joining());
+        } catch (NoSuchAlgorithmException|UnsupportedEncodingException ex) {
+            // should never happen since we use standard stuff
+            throw new InternalError(ex.getMessage());
         }
     }
 
@@ -152,22 +150,19 @@ public class GravatarServiceImpl implements GravatarService {
      */
     @Scheduled(fixedDelay = CACHE_CLEANUP)
     public void cacheCleanup() {
-        // Read all files sorted by their modification date, oldest first
-        SortedMap<Long, File> fileMap = new TreeMap<Long, File>();
-        for (File file : new File(cachePath).listFiles()) {
-            if (file.isFile() && !file.isHidden()) {
-                fileMap.put(file.lastModified(), file);
-            }
-        }
+        Arrays.stream(new File(cachePath).listFiles())
+                .filter(file -> file.isFile() && !file.isHidden())
+                .sorted(comparing(File::lastModified).reversed()) // younger files first
+                .skip(MAX_CACHE_ENTRIES)
+                .forEach(this::delete);
+    }
 
-        // Delete oldest entries until cache size is good again
-        while (fileMap.size() > MAX_CACHE_ENTRIES) {
-            Iterator<File> it = fileMap.values().iterator();
-            File file = it.next();
-            if (!file.delete()) {
-                log.warn("Could not delete expired Gravatar cache object: " + file.getPath());
-            }
-            it.remove();
+    /**
+     * Deletes a file, logs a warning if it could not be deleted.
+     */
+    private void delete(File file) {
+        if (!file.delete()) {
+            log.warn("Could not delete expired Gravatar cache object: " + file.getPath());
         }
     }
 
@@ -182,37 +177,33 @@ public class GravatarServiceImpl implements GravatarService {
     private void fetchGravatar(URL url, File file) throws IOException {
         limitUpstreamRequests();
 
-        InputStream in = null;
-        OutputStream out = null;
-        byte[] buffer = new byte[8192];
+        URLConnection conn = url.openConnection();
+        conn.setConnectTimeout(TIMEOUT);
+        conn.setReadTimeout(TIMEOUT);
 
-        try {
-            URLConnection conn = url.openConnection();
-            conn.setConnectTimeout(TIMEOUT);
-            conn.setReadTimeout(TIMEOUT);
+        if (file.exists()) {
+            conn.setIfModifiedSince(file.lastModified());
+        }
 
-            if (file.exists()) {
-                conn.setIfModifiedSince(file.lastModified());
+        conn.connect();
+
+        long lastModified = conn.getLastModified();
+        if (lastModified > 0L && lastModified <= file.lastModified()) {
+            // Cache file exists and is unchanged
+            if (log.isDebugEnabled()) {
+                log.debug("Cached Gravatar is still good: {}", url);
             }
 
-            conn.connect();
+            file.setLastModified(System.currentTimeMillis()); // touch
+            return;
+        }
 
-            long lastModified = conn.getLastModified();
-            if (lastModified > 0L && lastModified <= file.lastModified()) {
-                // Cache file exists and is unchanged
-                if (log.isDebugEnabled()) {
-                    log.debug("Cached Gravatar is still good: {}", url);
-                }
-
-                file.setLastModified(System.currentTimeMillis()); // touch
-                return;
-            }
-
-            in = conn.getInputStream();
-            out = new FileOutputStream(file);
-
+        try (InputStream in = conn.getInputStream();
+             OutputStream out = new FileOutputStream(file)) {
+            byte[] buffer = new byte[8192];
             int total = 0;
             int len;
+
             while ((len = in.read(buffer)) >= 0) {
                 out.write(buffer, 0, len);
                 total += len;
@@ -226,17 +217,6 @@ public class GravatarServiceImpl implements GravatarService {
 
             if (log.isDebugEnabled()) {
                 log.debug("Downloaded Gravatar: {}", url);
-            }
-
-        } finally {
-            try {
-                if (in != null) {
-                    in.close();
-                }
-            } finally {
-                if (out != null) {
-                    out.close();
-                }
             }
         }
     }

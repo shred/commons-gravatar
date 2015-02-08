@@ -85,14 +85,8 @@ public class GravatarCacheServlet extends FrameworkServlet {
         resp.setDateHeader("Date", System.currentTimeMillis());
         resp.setDateHeader("Last-Modified", gravatarFile.lastModified());
 
-        InputStream in = null;
-        try {
-            in = new FileInputStream(gravatarFile);
+        try (InputStream in = new FileInputStream(gravatarFile)) {
             FileCopyUtils.copy(in, resp.getOutputStream());
-        } finally {
-            if (in != null) {
-                in.close();
-            }
         }
     }
 
