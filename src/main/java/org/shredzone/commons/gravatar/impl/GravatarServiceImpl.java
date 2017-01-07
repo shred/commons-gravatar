@@ -50,8 +50,7 @@ import org.springframework.stereotype.Component;
  */
 @Component("gravatarService")
 public class GravatarServiceImpl implements GravatarService {
-
-    private final Logger log = LoggerFactory.getLogger(this.getClass());
+    private static final Logger LOG = LoggerFactory.getLogger(GravatarServiceImpl.class);
 
     private static final int MAX_GRAVATAR_SIZE = 256 * 1024;        // 256 KiB per image
     private static final int MAX_CACHE_ENTRIES = 500;               // 500 entries
@@ -84,9 +83,9 @@ public class GravatarServiceImpl implements GravatarService {
             return IntStream.range(0, digest.length)
                     .mapToObj(ix -> String.format("%02x", digest[ix] & 0xFF))
                     .collect(joining());
-        } catch (NoSuchAlgorithmException|UnsupportedEncodingException ex) {
+        } catch (NoSuchAlgorithmException | UnsupportedEncodingException ex) {
             // should never happen since we use standard stuff
-            throw new InternalError(ex.getMessage());
+            throw new InternalError(ex);
         }
     }
 
@@ -117,7 +116,7 @@ public class GravatarServiceImpl implements GravatarService {
         long fileTs = file.lastModified();
         long expiryTs = System.currentTimeMillis() - (aliveSeconds * 1000L);
 
-        return (fileTs < expiryTs);
+        return fileTs < expiryTs;
     }
 
     /**
@@ -137,7 +136,7 @@ public class GravatarServiceImpl implements GravatarService {
         requestCounter++;
 
         if (requestCounter > MAX_REQUESTS_COUNT && lastRequest >= recoveryTs) {
-            log.warn("More than {} requests were made to Gravatar server, recovering!", MAX_REQUESTS_COUNT);
+            LOG.warn("More than {} requests were made to Gravatar server, recovering!", MAX_REQUESTS_COUNT);
             throw new IOException("Request limit reached");
         }
 
@@ -160,9 +159,9 @@ public class GravatarServiceImpl implements GravatarService {
     /**
      * Deletes a file, logs a warning if it could not be deleted.
      */
-    private void delete(File file) {
+    private void delete(File file) { //NOSONAR: UnusedPrivateMethod, false positive
         if (!file.delete()) {
-            log.warn("Could not delete expired Gravatar cache object: " + file.getPath());
+            LOG.warn("Could not delete expired Gravatar cache object: {}", file.getPath());
         }
     }
 
@@ -190,11 +189,13 @@ public class GravatarServiceImpl implements GravatarService {
         long lastModified = conn.getLastModified();
         if (lastModified > 0L && lastModified <= file.lastModified()) {
             // Cache file exists and is unchanged
-            if (log.isDebugEnabled()) {
-                log.debug("Cached Gravatar is still good: {}", url);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Cached Gravatar is still good: {}", url);
             }
 
-            file.setLastModified(System.currentTimeMillis()); // touch
+            if (!file.setLastModified(System.currentTimeMillis())) { // touch
+                LOG.warn("Failed to touch cache file: {}", file.getAbsolutePath());
+            }
             return;
         }
 
@@ -208,15 +209,15 @@ public class GravatarServiceImpl implements GravatarService {
                 out.write(buffer, 0, len);
                 total += len;
                 if (total > MAX_GRAVATAR_SIZE) {
-                    log.warn("Gravatar exceeded maximum size: {}", url);
+                    LOG.warn("Gravatar exceeded maximum size: {}", url);
                     break;
                 }
             }
 
             out.flush();
 
-            if (log.isDebugEnabled()) {
-                log.debug("Downloaded Gravatar: {}", url);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Downloaded Gravatar: {}", url);
             }
         }
     }
