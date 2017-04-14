@@ -153,13 +153,13 @@ public class GravatarServiceImpl implements GravatarService {
                 .filter(file -> file.isFile() && !file.isHidden())
                 .sorted(comparing(File::lastModified).reversed()) // younger files first
                 .skip(MAX_CACHE_ENTRIES)
-                .forEach(this::delete);
+                .forEach(GravatarServiceImpl::delete);
     }
 
     /**
      * Deletes a file, logs a warning if it could not be deleted.
      */
-    private void delete(File file) { //NOSONAR: UnusedPrivateMethod, false positive
+    private static void delete(File file) { //NOSONAR: UnusedPrivateMethod, false positive
         if (!file.delete()) {
             LOG.warn("Could not delete expired Gravatar cache object: {}", file.getPath());
         }
