@@ -1,4 +1,4 @@
-# commons-gravatar ![build status](https://shredzone.org/badge/commons-gravatar.svg) ![maven central](https://maven-badges.herokuapp.com/maven-central/org.shredzone.commons/commons-gravatar/badge.svg)
+# commons-gravatar ![build status](https://shredzone.org/badge/commons-gravatar.svg) ![maven central](https://shredzone.org/maven-central/org.shredzone.commons/commons-gravatar/badge.svg)
 
 A caching proxy for Gravatar avatars written in Java.
 
